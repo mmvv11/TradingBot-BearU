@@ -47,6 +47,7 @@ class MyWindow(QMainWindow, ui):
         if (not buyResult) or "error" in buyResult:
             self.popup(f"매수 API 에러: {buyResult['error']['message']}")
             return False
+        self.popup(f"매수 주문 완료, {buyPrice}원")
 
     def sellMarketPrice(self):
         """
@@ -64,6 +65,8 @@ class MyWindow(QMainWindow, ui):
         if (not sellResult) or "error" in sellResult:
             self.popup(f"매도 API 에러: {sellResult['error']['message']}")
             return False
+        self.popup(f"매도 주문 완료, {sellPrice}원")
+
 
     def popup(self, message):
         QMessageBox.information(self, "알림", message)
