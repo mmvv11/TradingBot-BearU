@@ -43,9 +43,9 @@ class MyWindow(QMainWindow, ui):
             self.popup("숫자만 입력해주세요.")
             return False
 
-        buyResult = upbit.buy_market_order(self.ticker, 5000)
+        buyResult = upbit.buy_market_order(self.ticker, buyPrice)
         if (not buyResult) or "error" in buyResult:
-            self.popup("조회 API 에러")
+            self.popup(f"매수 API 에러: {buyResult['error']['message']}")
             return False
 
     def sellMarketPrice(self):
@@ -54,9 +54,19 @@ class MyWindow(QMainWindow, ui):
         upbit 시장가 매도 API 호출
         :return: 
         """
+        sellPrice = self.sellTextEdit.toPlainText()
+
+        if not self.isNumber(sellPrice):
+            self.popup("숫자만 입력해주세요.")
+            return False
+
+        sellResult = upbit.sell_market_order(self.ticker, sellPrice)
+        if (not sellResult) or "error" in sellResult:
+            self.popup(f"매도 API 에러: {sellResult['error']['message']}")
+            return False
 
     def popup(self, message):
-        QMessageBox.information(self, "QMessageBox", message)
+        QMessageBox.information(self, "알림", message)
 
     def isNumber(self, num):
         try:
