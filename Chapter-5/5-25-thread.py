@@ -68,9 +68,12 @@ class Main(QMainWindow, ui):
             interval = "minute240"
         elif self.radioButtonDay.isChecked():
             interval = "day"
+        
+        # TODO 티커 UI에서 가져오기
+        ticker = 1
 
-        if tradingRange and interval:
-            self.bot.setting(tradingRange, interval)
+        if tradingRange and interval and ticker:
+            self.bot.setting(tradingRange, interval, ticker)
             return True
         else:
             return False
@@ -109,9 +112,10 @@ class Bot(QThread):
         self.secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
         self.upbit = pyupbit.Upbit(self.access, self.secret)
 
-    def setting(self, tradingRange, interval):
+    def setting(self, tradingRange, interval, ticker):
         self.tradingRange = tradingRange
         self.interval = interval
+        self.ticker = ticker
 
         df = pyupbit.get_ohlcv("KRW-BTC", interval=self.interval)
         period = 20  # 일이 아니라 갯수
@@ -179,14 +183,14 @@ class Bot(QThread):
             """
             매수
             """
-            buyResult = self.upbit.buy_market_order("KRW-BTC", 5000)
+            buyResult = self.upbit.buy_market_order(self.ticker, 5000)
             print(buyResult)
         if status == "sell":
             """
             매도
             """
-            volume = self.upbit.get_balance("KRW-BTC")
-            sellResult = self.upbit.sell_market_order("KRW-BTC", volume)
+            volume = self.upbit.get_balance(self.ticker)
+            sellResult = self.upbit.sell_market_order(self.ticker, volume)
             print(sellResult)
 
 
