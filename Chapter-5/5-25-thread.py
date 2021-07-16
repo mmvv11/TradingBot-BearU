@@ -7,9 +7,12 @@ n초 간격으로 현재가 감시,
 상승장 매수: 이전 봉 종가 20선 아래에 있을 때, 20선 +n% 범위에서 매수
 상승장 매도: 천장 +-n% 범위에서 매도
 """
+from datetime import datetime
+
 import pyupbit
 from time import sleep
 import sys
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import *
@@ -39,12 +42,12 @@ class Main(QMainWindow, ui):
 
     def checkSetting(self):
         """
-        설정값 확인 및 세팅
+        설정값 확인 및 초기세팅
         :return:
         """
         tradingRange = self.textEditTradingRange.toPlainText()
         try:
-            tradingRange = float(tradingRange)/100
+            tradingRange = float(tradingRange) / 100
         except:
             tradingRange = False
 
@@ -68,12 +71,9 @@ class Main(QMainWindow, ui):
             interval = "minute240"
         elif self.radioButtonDay.isChecked():
             interval = "day"
-        
-        # TODO 티커 UI에서 가져오기
-        ticker = 1
 
-        if tradingRange and interval and ticker:
-            self.bot.setting(tradingRange, interval, ticker)
+        if tradingRange and interval:
+            self.bot.firstSetting(tradingRange, interval)
             return True
         else:
             return False
@@ -87,9 +87,8 @@ class Main(QMainWindow, ui):
             self.bot.start()
 
     def stopBot(self):
-        if self.bot.isRunning:
-            self.bot.isRunning = False
-            self.popup("봇 종료")
+        self.bot.stopBot()
+        self.popup("봇 종료")
 
     def popup(self, message):
         """
@@ -104,6 +103,7 @@ class Bot(QThread):
     def __init__(self):
         super(Bot, self).__init__()
         self.isRunning = False
+        self.schedule = BlockingScheduler()
 
         """
         API key
@@ -112,11 +112,40 @@ class Bot(QThread):
         self.secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
         self.upbit = pyupbit.Upbit(self.access, self.secret)
 
-    def setting(self, tradingRange, interval, ticker):
+    def run(self):
+        """
+        봇 실행
+        :return:
+        """
+        if self.interval == "minute1":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/1", second="2", id='job')
+        if self.interval == "minute3":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/3", second="2", id='job')
+        if self.interval == "minute5":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/5", second="2", id='job')
+        if self.interval == "minute10":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/10", second="2", id='job')
+        if self.interval == "minute15":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/15", second="2", id='job')
+        if self.interval == "minute30":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/30", second="2", id='job')
+        if self.interval == "minute60":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', hour="*", second="2", id="job")
+        if self.interval == "minute240":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', hour="*/4", second="2", id="job")
+        if self.interval == "day":
+            self.schedule.add_job(self.getPriceInfomation, 'cron', day="*", hour="0", minute="0", second="2", id="job")
+        self.schedule.start()
+
+        self.startBot()
+
+    def firstSetting(self, tradingRange, interval):
         self.tradingRange = tradingRange
         self.interval = interval
-        self.ticker = ticker
+        self.ticker = "KRW-BTC"
+        self.getPriceInfomation()
 
+    def getPriceInfomation(self):
         df = pyupbit.get_ohlcv("KRW-BTC", interval=self.interval)
         period = 20  # 일이 아니라 갯수
         multiplier = 2
@@ -128,14 +157,9 @@ class Bot(QThread):
         self.MA20 = df.iloc[-1]['MiddleBand']
         self.ceiling = df.iloc[-1]['UpperBand']
         self.bottom = df.iloc[-1]['LowerBand']
-        self.previousClosePrice = df.iloc[-2]['close']
+        self.previousClosePrice = df.iloc[-1]['close']
 
-    def run(self):
-        """
-        봇 실행
-        :return:
-        """
-        self.startBot()
+        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     def startBot(self):
         if not self.isRunning:
@@ -144,7 +168,7 @@ class Bot(QThread):
         while self.isRunning:
             currentPrice = pyupbit.get_current_price()
             status = self.getStatus(currentPrice)
-            self.tradingLogic(status, currentPrice)
+            self.tradingLogic(status)
             sleep(1)
 
     def stopBot(self):
@@ -163,7 +187,7 @@ class Bot(QThread):
         buyingCondition = (self.MA20 <= price <= maxBuyingRange) and (self.previousClosePrice < self.MA20)
         sellingCondition = minSellingRange <= price
 
-        print(self.ceiling ,minSellingRange, price)
+        print(self.ceiling, minSellingRange, price)
 
         if buyingCondition:
             return "buy"
@@ -171,7 +195,7 @@ class Bot(QThread):
             return "sell"
         return None
 
-    def tradingLogic(self, status, currentPrice):
+    def tradingLogic(self, status):
         """
         매매로직 수행행
        :param status:
@@ -192,6 +216,8 @@ class Bot(QThread):
             volume = self.upbit.get_balance(self.ticker)
             sellResult = self.upbit.sell_market_order(self.ticker, volume)
             print(sellResult)
+
+    # TODO 기준봉마다 셋팅값 업데이트 할 것
 
 
 app = QApplication(sys.argv)
