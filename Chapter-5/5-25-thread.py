@@ -157,7 +157,7 @@ class Bot(QThread):
         self.MA20 = df.iloc[-1]['MiddleBand']
         self.ceiling = df.iloc[-1]['UpperBand']
         self.bottom = df.iloc[-1]['LowerBand']
-        self.previousClosePrice = df.iloc[-1]['close']
+        self.previousHighPrice = df.iloc[-1]['high']
 
         print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
@@ -166,8 +166,8 @@ class Bot(QThread):
             self.isRunning = True
 
         while self.isRunning:
-            currentPrice = pyupbit.get_current_price()
-            status = self.getStatus(currentPrice)
+            self.currentPrice = pyupbit.get_current_price(self.ticker)
+            status = self.getStatus(self.currentPrice)
             self.tradingLogic(status)
             sleep(1)
 
@@ -184,7 +184,7 @@ class Bot(QThread):
         maxBuyingRange = self.MA20 * (1 + self.tradingRange)
         minSellingRange = self.ceiling * (1 - self.tradingRange)
 
-        buyingCondition = (self.MA20 <= price <= maxBuyingRange) and (self.previousClosePrice < self.MA20)
+        buyingCondition = (self.MA20 <= price <= maxBuyingRange) and (self.previousHighPrice < self.MA20)
         sellingCondition = minSellingRange <= price
 
         print(self.ceiling, minSellingRange, price)
@@ -203,22 +203,28 @@ class Bot(QThread):
         """
         if not status:
             return
+
         if status == "buy":
             """
             매수
             """
+            krwBalance = self.upbit.get_balance()
+            if krwBalance < 5000:
+                return
+
             buyResult = self.upbit.buy_market_order(self.ticker, 5000)
-            print(buyResult)
+
         if status == "sell":
             """
             매도
             """
             volume = self.upbit.get_balance(self.ticker)
+            tickerBalacne = volume * self.currentPrice
+
+            if tickerBalacne < 5000:
+                return
+
             sellResult = self.upbit.sell_market_order(self.ticker, volume)
-            print(sellResult)
-
-    # TODO 기준봉마다 셋팅값 업데이트 할 것
-
 
 app = QApplication(sys.argv)
 window = Main()
