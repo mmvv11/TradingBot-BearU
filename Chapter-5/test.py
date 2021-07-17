@@ -22,7 +22,7 @@ period = 20  # 일이 아니라 갯수
 df['MiddleBand'] = df['close'].rolling(period).mean()
 df['UpperBand'] = df['close'].rolling(period).mean() + df['close'].rolling(period).std() * multiplier
 df['LowerBand'] = df['close'].rolling(period).mean() - df['close'].rolling(period).std() * multiplier
-df['sellingPrice'] = df['UpperBand'] * 0.995
+df['sellingPrice'] = df['MiddleBand'] + (df['UpperBand'] - df['MiddleBand'])*(2/3)
 
 ax = plt.gca()
 
