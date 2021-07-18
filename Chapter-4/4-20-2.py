@@ -61,7 +61,10 @@ class MyWindow(QMainWindow, ui):
             self.popup("숫자만 입력해주세요.")
             return False
 
-        sellResult = upbit.sell_market_order(self.ticker, sellPrice)
+        askPrice = pyupbit.get_orderbook(self.ticker)[0]['orderbook_units'][0]['bid_price']
+        volume = sellPrice / askPrice
+
+        sellResult = self.upbit.sell_market_order(self.ticker, volume)
         if (not sellResult) or "error" in sellResult:
             self.popup(f"매도 API 에러: {sellResult['error']['message']}")
             return False
