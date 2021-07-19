@@ -9,7 +9,7 @@ from datetime import datetime
 import pyupbit
 from time import sleep
 import sys
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import *
@@ -130,10 +130,7 @@ class Bot(QThread):
         실행상태를 관리할 수 있는 속성
         """
         self.isRunning = False
-        """
-        기준봉에 따라 데이터를 업데이트하기 위한 스케줄러
-        """
-        self.schedule = BlockingScheduler()
+
         """
         Private API를 요청하기 위한 객체 생성
         """
@@ -159,9 +156,13 @@ class Bot(QThread):
         self.interval = interval
         self.ticker = "KRW-BTC"
         self.getPriceInfomation()
+        """
+        기준봉에 따라 데이터를 업데이트하기 위한 스케줄러
+        """
+        self.schedule = BackgroundScheduler()
 
         if self.interval == "minute1":
-            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/1", second="2", id='job')
+            self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/3", second="2", id='job')
         if self.interval == "minute3":
             self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/3", second="2", id='job')
         if self.interval == "minute5":
@@ -208,9 +209,9 @@ class Bot(QThread):
         print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
         while self.isRunning:
-            self.currentPrice = pyupbit.get_current_price(self.ticker) # 가격 조회
-            status = self.getStatus(self.currentPrice) # 가격 상태 조회
-            self.tradingLogic(status) # 가격 상태에 따른 로직 수행
+            self.currentPrice = pyupbit.get_current_price(self.ticker)  # 가격 조회
+            status = self.getStatus(self.currentPrice)  # 가격 상태 조회
+            self.tradingLogic(status)  # 가격 상태에 따른 로직 수행
             sleep(1)
 
     def stopBot(self):
