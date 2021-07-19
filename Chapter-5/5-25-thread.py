@@ -3,9 +3,6 @@
 
 n초 간격으로 현재가 감시,
 상승장 매수 구간, 상승장 매도구간 도달시 매매 이벤트 발생
-
-상승장 매수: 이전 봉 종가 20선 아래에 있을 때, 20선 +n% 범위에서 매수
-상승장 매도: 천장 +-n% 범위에서 매도
 """
 from datetime import datetime
 
@@ -22,15 +19,18 @@ ui = uic.loadUiType("5-20.ui")[0]
 
 
 class Main(QMainWindow, ui):
+    """
+    GUI를 구성하는 메인클래스
+    기준봉을 설정하고 봇을 실행, 중지
+    """
+
     def __init__(self):
-        """
-        20선, 천장, 바닥 가격을 속성으로 가지고 있어야함
-        +-n% 범위를 속성으로 가지고 있어야함
-        """
         super().__init__()
         self.setupUi(self)
+        """
+        봇 객체
+        """
         self.bot = Bot()
-
         """
         봇 실행
         """
@@ -40,17 +40,11 @@ class Main(QMainWindow, ui):
         """
         self.pushButtonStop.clicked.connect(self.stopBot)
 
-    def checkSetting(self):
+    def getInterval(self):
         """
-        설정값 확인 및 초기세팅
+        기준봉 값 확인
         :return:
         """
-        tradingRange = self.textEditTradingRange.toPlainText()
-        try:
-            tradingRange = float(tradingRange) / 100
-        except:
-            tradingRange = False
-
         interval = None
 
         if self.radioButton1.isChecked():
@@ -72,23 +66,43 @@ class Main(QMainWindow, ui):
         elif self.radioButtonDay.isChecked():
             interval = "day"
 
-        if tradingRange and interval:
-            self.bot.firstSetting(tradingRange, interval)
-            return True
-        else:
+        if not interval:
             return False
 
-    def startBot(self):
-        if not self.checkSetting():
-            self.popup("설정값을 확인하세요.")
-            return
+        return interval
 
-        if not self.bot.isRunning:
-            self.bot.start()
+    def startBot(self):
+        """
+        봇 실행 메서드
+        1. 봇이 이미 실행중인지 확인
+        2. 기준봉이 설정되어있는지 확인
+        3. 봇이 꺼져있다면 실행
+        :return:
+        """
+
+        if self.bot.isRunning:
+            return self.popup("봇이 이미 실행중입니다.")
+
+        interval = self.getInterval()
+        if not interval:
+            return self.popup("설정값을 확인하세요.")
+
+        self.bot.firstSetting(interval)
+        self.bot.start()
 
     def stopBot(self):
+        """
+        봇 종료 메서드
+
+        1. 봇이 실행중인지 확인
+        2. 봇 종료
+        :return:
+        """
+        if not self.bot.isRunning:
+            return self.popup("실행 상태가 아닙니다.")
+
         self.bot.stopBot()
-        self.popup("봇 종료")
+        return self.popup("봇을 종료합니다.")
 
     def popup(self, message):
         """
@@ -100,23 +114,52 @@ class Main(QMainWindow, ui):
 
 
 class Bot(QThread):
+    """
+    Bot 클래스는 Main 클래스로부터 설정값을 받아온다.
+    스레드 형태로 대상 코인 시세를 1초 단위로 감시하며 매매로직을 수행한다.
+
+    매매 로직은 다음과 같다.
+
+    매수: 이전 봉 고가가 중앙선 아래에 있고, 현재 가격이 20선을 돌파한 경우
+    매도: 현재 가격이 상단 밴드와 중앙선 2/3지점을 돌파한 경우
+    """
+
     def __init__(self):
         super(Bot, self).__init__()
+        """
+        실행상태를 관리할 수 있는 속성
+        """
         self.isRunning = False
+        """
+        기준봉에 따라 데이터를 업데이트하기 위한 스케줄러
+        """
         self.schedule = BlockingScheduler()
-
         """
-        API key
+        Private API를 요청하기 위한 객체 생성
         """
-        self.access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
-        self.secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
-        self.upbit = pyupbit.Upbit(self.access, self.secret)
+        access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
+        secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
+        self.upbit = pyupbit.Upbit(access, secret)
 
     def run(self):
         """
         봇 실행
-        :return:
         """
+        self.startBot()
+
+    def firstSetting(self, interval):
+        """
+        초기값 세팅
+
+        기준봉 : interval
+        대상코인 : ticker
+        초기 데이터: 상단밴드, 중앙밴드, 이전고가 데이터
+        스케줄 : 기준봉에 따라 상단밴드, 중앙밴드, 이전고가 데이터 업데이트
+        """
+        self.interval = interval
+        self.ticker = "KRW-BTC"
+        self.getPriceInfomation()
+
         if self.interval == "minute1":
             self.schedule.add_job(self.getPriceInfomation, 'cron', minute="*/1", second="2", id='job')
         if self.interval == "minute3":
@@ -135,59 +178,65 @@ class Bot(QThread):
             self.schedule.add_job(self.getPriceInfomation, 'cron', hour="*/4", second="2", id="job")
         if self.interval == "day":
             self.schedule.add_job(self.getPriceInfomation, 'cron', day="*", hour="0", minute="0", second="2", id="job")
+
         self.schedule.start()
 
-        self.startBot()
-
-    def firstSetting(self, tradingRange, interval):
-        self.tradingRange = tradingRange
-        self.interval = interval
-        self.ticker = "KRW-BTC"
-        self.getPriceInfomation()
-
     def getPriceInfomation(self):
+        """
+        기준봉에 따라 상단밴드, 중앙선, 이전 고가 데이터를 가져오는 메서드
+        """
         df = pyupbit.get_ohlcv("KRW-BTC", interval=self.interval)
         period = 20  # 일이 아니라 갯수
         multiplier = 2
 
-        df['MiddleBand'] = df['close'].rolling(period).mean()
-        df['UpperBand'] = df['close'].rolling(period).mean() + df['close'].rolling(period).std() * multiplier
-        df['LowerBand'] = df['close'].rolling(period).mean() - df['close'].rolling(period).std() * multiplier
+        df['middleBand'] = df['close'].rolling(period).mean()
+        df['upperBand'] = df['close'].rolling(period).mean() + df['close'].rolling(period).std() * multiplier
 
-        self.MA20 = df.iloc[-1]['MiddleBand']
-        self.ceiling = df.iloc[-1]['UpperBand']
-        self.bottom = df.iloc[-1]['LowerBand']
+        self.MA20 = df.iloc[-1]['middleBand']
+        self.ceiling = df.iloc[-1]['upperBand']
         self.previousHighPrice = df.iloc[-1]['high']
 
-        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-
     def startBot(self):
+        """
+        봇 실행
+
+        1초 단위로 가격을 감시하고 매매타이밍을 포착
+        """
         if not self.isRunning:
             self.isRunning = True
 
+        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
         while self.isRunning:
-            self.currentPrice = pyupbit.get_current_price(self.ticker)
-            status = self.getStatus(self.currentPrice)
-            self.tradingLogic(status)
+            self.currentPrice = pyupbit.get_current_price(self.ticker) # 가격 조회
+            status = self.getStatus(self.currentPrice) # 가격 상태 조회
+            self.tradingLogic(status) # 가격 상태에 따른 로직 수행
             sleep(1)
 
     def stopBot(self):
+        """
+        봇 실행 종료 메서드
+        
+        isRunning => false
+        스케줄러 취소하기
+        """
         if self.isRunning:
             self.isRunning = False
+            self.schedule.remove_job("job")
+            print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
     def getStatus(self, price):
         """
         현재 가격 상태 반환
-        :param price:
-        :return:
+
+        매수 타이밍 => buy
+        매도 타이밍 => sell
+        나머지 => None
         """
-        maxBuyingRange = self.MA20 * (1 + self.tradingRange)
-        minSellingRange = self.ceiling * (1 - self.tradingRange)
+        minSellingRange = self.MA20 + (self.ceiling - self.MA20) * (2 / 3)
 
-        buyingCondition = (self.MA20 <= price <= maxBuyingRange) and (self.previousHighPrice < self.MA20)
+        buyingCondition = (self.MA20 <= price) and (self.previousHighPrice < self.MA20)
         sellingCondition = minSellingRange <= price
-
-        print(self.ceiling, minSellingRange, price)
 
         if buyingCondition:
             return "buy"
@@ -197,8 +246,7 @@ class Bot(QThread):
 
     def tradingLogic(self, status):
         """
-        매매로직 수행행
-       :param status:
+        매매로직 수행
         :return:
         """
         if not status:
@@ -214,6 +262,12 @@ class Bot(QThread):
 
             buyResult = self.upbit.buy_market_order(self.ticker, 5000)
 
+            # if (not buyResult) or ("error" in buyResult):
+            #     logger.error(f"매수 API 에러 {buyResult}")
+            #     return False
+            #
+            # logger.info(f"매수 주문 {buyResult}")
+
         if status == "sell":
             """
             매도
@@ -225,6 +279,13 @@ class Bot(QThread):
                 return
 
             sellResult = self.upbit.sell_market_order(self.ticker, volume)
+
+            # if (not sellResult) or ("error" in sellResult):
+            #     logger.error(f"매도 API 에러 {sellResult}")
+            #     return False
+            #
+            # logger.info(f"매도 주문 {sellResult}")
+
 
 app = QApplication(sys.argv)
 window = Main()
