@@ -1,3 +1,4 @@
+import os
 import sys
 
 from PyQt5.QtCore import QThread
@@ -7,7 +8,15 @@ import pyupbit
 from apscheduler.schedulers.background import BackgroundScheduler
 from time import sleep
 
-ui = uic.loadUiType("5-25.ui")[0]
+from apscheduler.triggers.combining import OrTrigger
+from apscheduler.triggers.cron import CronTrigger
+
+def resourcePath(relativePath):
+    basePath = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(basePath, relativePath)
+
+uiPath = resourcePath('5-25.ui')
+ui = uic.loadUiType(uiPath)[0]
 
 
 class Main(QMainWindow, ui):
@@ -139,28 +148,33 @@ class Bot(QThread):
         """
         self.scheduler = BackgroundScheduler()
 
-        if self.interval == "minute1":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*", second="2", id="job")
-        if self.interval == "minute3":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/3", second="2", id="job")
-        if self.interval == "minute5":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/5", second="2", id="job")
-        if self.interval == "minute10":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/10", second="2", id="job")
-        if self.interval == "minute15":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/15", second="2", id="job")
-        if self.interval == "minute30":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/30", second="2", id="job")
-        if self.interval == "minute60":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', hour="*", second="2", id="job")
-        if self.interval == "minute240":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', hour="*/4", second="2", id="job")
-        if self.interval == "day":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', day="*", hour="0", minute="0", second="2", id="job")
 
+        if self.interval == "minute1":
+            trigger = OrTrigger([CronTrigger(minute="*", second="2")])
+        if self.interval == "minute3":
+            trigger = OrTrigger([CronTrigger(minute="*/3", second="2")])
+        if self.interval == "minute5":
+            trigger = OrTrigger([CronTrigger(minute="*/5", second="2")])
+        if self.interval == "minute10":
+            trigger = OrTrigger([CronTrigger(minute="*/10", second="2")])
+        if self.interval == "minute15":
+            trigger = OrTrigger([CronTrigger(minute="*/15", second="2")])
+        if self.interval == "minute30":
+            trigger = OrTrigger([CronTrigger(minute="*/30", second="2")])
+        if self.interval == "minute60":
+            trigger = OrTrigger([CronTrigger(hour="*", second="2")])
+        if self.interval == "minute240":
+            trigger = OrTrigger([CronTrigger(hour="*/4", second="2")])
+        if self.interval == "day":
+            trigger = OrTrigger([CronTrigger(day="*", hour="0", minute="0", second="2")])
+
+        self.scheduler.add_job(self.updatePriceInfo, trigger, id="job")
         self.scheduler.start()
 
+
+
     def updatePriceInfo(self):
+
         data = pyupbit.get_ohlcv(self.ticker, interval=self.interval)
 
         period = 20
@@ -224,7 +238,6 @@ class Bot(QThread):
 
             buyResult = self.upbit.buy_market_order(self.ticker, balance)
 
-
         if status == "sell":
             volume = self.upbit.get_balance(self.ticker)
 
@@ -234,7 +247,6 @@ class Bot(QThread):
                 return
 
             sellReult = self.upbit.sell_market_order(self.ticker, volume)
-
 
     def stopBot(self):
         """
