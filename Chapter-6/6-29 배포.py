@@ -56,10 +56,15 @@ class Main(QMainWindow, ui):
             return self.popup("봇이 이미 실행 중입니다.")
 
         interval = self.getInterval()
+
         if not interval:
             return self.popup("기준봉을 설정해주세요.")
 
-        self.bot.firstSetting(interval)
+        isValidStart = self.bot.firstSetting(interval)
+
+        if not isValidStart:
+            return self.popup("유효한 API키가 아닙니다.")
+
         self.bot.start()
 
     def stopBot(self):
@@ -127,8 +132,10 @@ class Bot(QThread):
         """
         private API 객체
         """
-        access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
-        secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
+        # access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
+        access = "gXP6ewHuDQQbGp925ieK83APklqExT6BUx4oHXYa"
+        # secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
+        secret = "oCqRyS1tTexJZTxRSDywYndGkxQEmr78pXV2k11l"
         self.upbit = pyupbit.Upbit(access, secret)
 
         """
@@ -140,6 +147,11 @@ class Bot(QThread):
         self.startBot()
 
     def firstSetting(self, interval):
+        isValidAPI = self.upbit.get_balance()
+
+        if not isValidAPI:
+            return False
+
         self.interval = interval
         self.updatePriceInfo()
 
@@ -171,6 +183,7 @@ class Bot(QThread):
         self.scheduler.add_job(self.updatePriceInfo, trigger, id="job")
         self.scheduler.start()
 
+        return True
 
 
     def updatePriceInfo(self):
@@ -254,8 +267,11 @@ class Bot(QThread):
         - 스케줄러 중지
         """
         if self.isRunning:
+            print(1)
             self.isRunning = False
+            print(2)
             self.scheduler.remove_job("job")
+            print(3)
 
 
 app = QApplication(sys.argv)

@@ -27,8 +27,7 @@ exe = EXE(pyz,
           strip=False,
           upx=True,
           console=False,
-          icon='C:\\tech\\TradingBot-BearU\\Chapter-6\\icon.ico'
-          )
+          icon='C:\\tech\\TradingBot-BearU\\Chapter-6\\icon.ico')
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
@@ -36,4 +35,4 @@ coll = COLLECT(exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='6-29 배포')
+               name='program')
