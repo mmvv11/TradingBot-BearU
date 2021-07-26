@@ -1,1 +1,4 @@
 .idea
+/Chapter-6/dist/
+/Chapter-6/build/
+/Chapter-5/*.csv

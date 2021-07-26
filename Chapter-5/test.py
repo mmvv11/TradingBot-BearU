@@ -1,30 +1,40 @@
 import pyupbit
 from apscheduler.schedulers.background import BackgroundScheduler
 
-access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
-secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
+# access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
+access = "gXP6ewHuDQQbGp925ieK83APklqExT6BUx4oHXYa"
+# secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
+secret = "oCqRyS1tTexJZTxRSDywYndGkxQEmr78pXV2k11l"
 upbit = pyupbit.Upbit(access, secret)
 
 
-schedule = BackgroundScheduler()
+a = 1
 
-def a():
-    print(1)
+def t():
+    print(a)
 
-schedule.add_job(a, 'cron', second="*/3", id="job")
+t()
 
-schedule.start()
 
-print("hi1")
-
-schedule.remove_job("job")
-
-schedule.add_job(a, 'cron', second="*/3", id="job")
-
-schedule.start()
-
-print("hi222")
-
+# schedule = BackgroundScheduler()
+#
+# def a():
+#     print(1)
+#
+# schedule.add_job(a, 'cron', second="*/3", id="job")
+#
+# schedule.start()
+#
+# print("hi1")
+#
+# schedule.remove_job("job")
+#
+# schedule.add_job(a, 'cron', second="*/3", id="job")
+#
+# schedule.start()
+#
+# print("hi222")
+#
 
 
 

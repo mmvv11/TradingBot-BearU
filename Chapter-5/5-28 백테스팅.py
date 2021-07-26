@@ -1,6 +1,5 @@
 import pyupbit
 import pandas as pd
-import numpy as np
 
 pd.options.display.float_format = '{:.1f}'.format
 access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
@@ -10,21 +9,53 @@ upbit = pyupbit.Upbit(access, secret)
 period = 20
 multiplier = 2
 
+isValidBuy = True
+isValidSell = False
+
+"""
+백테스트에 필요한 데이터 가져오기. 4시간봉
+"""
 df = pyupbit.get_ohlcv("KRW-BTC", interval="minute240")
-df['middleBand'] = df['close'].rolling(period).mean()
-df['upperBand'] = df['close'].rolling(period).mean() + df['close'].rolling(period).std() * multiplier
+df['middleBand'] = df['close'].rolling(period).mean()  # 중간 밴드
+df['upperBand'] = df['close'].rolling(period).mean() + df['close'].rolling(period).std() * multiplier  # 상단 밴드
+df['sellingPrice'] = df['middleBand'] + (df['upperBand'] - df['middleBand']) * 0.9  # 목표가 밴드
 
 """
-천장-n% 계산 컬럼, 매수조건 부합, 매도조건 부합, 
+비교를 쉽게하기 위해 같은 행에 이전 데이터 값을 불러오기
 """
-df['sellingPrice'] = df['middleBand'] + (df['upperBand'] - df['middleBand'])*(2/3)
-# 현재봉 고가가 이전봉 ma20이상 and 이전봉 고가는 이전봉 ma20아래에 있을 것
-# buyingCondition = (df['middleBand'].shift(1) <= df['high']) and (df['high'].shift(1) < df['middleBand'].shift(1))
-df['matchForBuying'] = np.where((df['middleBand'].shift(1) <= df['high']) & (df['high'].shift(1) < df['middleBand'].shift(1)), "buy", "")
-# 현재봉 고가가 이전봉 sellingPrice 이상.
-# sellingCondition = df['high'] >= df['sellingPrice'].shift(1)
-df['matchForSelling'] = np.where(df['high'] >= df['sellingPrice'].shift(1), "sell", "")
+df['prevHigh'] = df['high'].shift(1)
+df['prevMiddle'] = df['middleBand'].shift(1)
+df['prevClose'] = df['close'].shift(1)
+df['prevSellingPrice'] = df['sellingPrice'].shift(1)
 
-df = df[['high', 'close', 'middleBand', 'upperBand', 'sellingPrice', 'matchForBuying', 'matchForSelling']]
+df['isBuying'] = (df['prevMiddle'] <= df['high']) & (df['prevHigh'] < df['prevMiddle'])
+df['isSelling'] = df['high'] >= df['prevSellingPrice']
 
-df.to_csv("data240.csv", encoding='utf-8')
+df.to_csv("show.csv")  # csv 파일로 만들기
+
+
+def getROR(df):
+    global isValidBuy, isValidSell, buyingPrice, sellingPrice
+
+    if (df['prevMiddle'] <= df['high']) & (df['prevHigh'] < df['prevMiddle']) & isValidBuy:
+        isValidBuy = False
+        isValidSell = True
+        buyingPrice = df['prevClose']
+
+    if (df['high'] >= df['prevSellingPrice']) & isValidSell:
+        isValidBuy = True
+        isValidSell = False
+        sellingPrice = df['prevSellingPrice']
+
+        return sellingPrice / buyingPrice
+
+    return 1
+
+
+df['ror'] = df.apply(getROR, axis=1)
+
+df = df[['high', 'close', 'middleBand', 'upperBand', 'ror']]
+
+ror = df['ror'].cumprod()[-1]
+
+print(ror)
