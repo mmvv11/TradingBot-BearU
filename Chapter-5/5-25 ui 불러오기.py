@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import *
 from PyQt5 import uic
 
-ui = uic.loadUiType("5-25.ui")[0]
+ui = uic.loadUiType("ui.ui")[0]
 
 class Main(QMainWindow, ui):
     def __init__(self):

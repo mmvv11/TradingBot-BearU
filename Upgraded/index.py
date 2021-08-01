@@ -1,3 +1,4 @@
+import os
 import sys
 
 from PyQt5.QtCore import QThread
@@ -7,14 +8,24 @@ import pyupbit
 from apscheduler.schedulers.background import BackgroundScheduler
 from time import sleep
 
-ui = uic.loadUiType("ui.ui")[0]
+from apscheduler.triggers.combining import OrTrigger
+from apscheduler.triggers.cron import CronTrigger
+
+
+def resourcePath(relativePath):
+    basePath = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(basePath, relativePath)
+
+
+uiPath = resourcePath('index.ui')
+ui = uic.loadUiType(uiPath)[0]
 
 
 class Main(QMainWindow, ui):
     """
     GUI를 구성합니다.
-
-    기준봉을 설정하고, 봇을 실행, 중지
+    설정값을 저장합니다. (기준봉, API Key, 코인명, 매매 범위)
+    봇을 실행, 중지
     """
 
     def __init__(self):
@@ -39,18 +50,42 @@ class Main(QMainWindow, ui):
         봇 실행 메서드
 
         1. 봇이 이미 실행 중인가 확인
-        2. 기준봉이 설정되어 있는가 확인
+        2. 설정값 확인
         3. 봇이 꺼져있으면 실행시킨다.
         """
 
         if self.bot.isRunning:
             return self.popup("봇이 이미 실행 중입니다.")
 
+        # 기준봉 설정
         interval = self.getInterval()
+
         if not interval:
             return self.popup("기준봉을 설정해주세요.")
 
-        self.bot.firstSetting(interval)
+        # 티커 설정
+        ticker = "KRW-" + self.textEditTarget.toPlainText()
+        isValidTicker = pyupbit.get_current_price(ticker)
+
+        if not isValidTicker:
+            return self.popup("유효한 코인명이 아닙니다.")
+
+        # 매매구간 설정
+        range = self.textEditRange.toPlainText()
+        try:
+            range = float(range)
+        except:
+            return self.popup("매매구간을 확인해주세요.")
+
+        # API Key 설정
+        access = self.textEditAccess.toPlainText()
+        secret = self.textEditSecret.toPlainText()
+
+        isValidStart = self.bot.firstSetting(interval, ticker, range, access, secret)
+
+        if not isValidStart:
+            return self.popup("유효한 API키가 아닙니다.")
+
         self.bot.start()
 
     def stopBot(self):
@@ -115,23 +150,27 @@ class Bot(QThread):
         super(Bot, self).__init__()
         self.isRunning = False
 
-        """
-        private API 객체
-        """
-        access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
-        secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
-        self.upbit = pyupbit.Upbit(access, secret)
-
-        """
-        대상 코인
-        """
-        self.ticker = "KRW-BTC"
 
     def run(self):
         self.startBot()
 
-    def firstSetting(self, interval):
+    def firstSetting(self, interval, ticker, range, access, secret):
+
+
+        # 코인명
+        self.ticker = ticker
+        # 매도범위
+        self.range = range
+        # private API 객체
+        self.upbit = pyupbit.Upbit(access, secret)
+        # API Key 유효성 검증
+        isValidAPI = self.upbit.get_balance()
+        if not isValidAPI:
+            return False
+        
+        # 기준봉 설정
         self.interval = interval
+        # 가격 데이터 최초 업데이트
         self.updatePriceInfo()
 
         """
@@ -140,27 +179,31 @@ class Bot(QThread):
         self.scheduler = BackgroundScheduler()
 
         if self.interval == "minute1":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(minute="*", second="2")])
         if self.interval == "minute3":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/3", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(minute="*/3", second="2")])
         if self.interval == "minute5":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/5", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(minute="*/5", second="2")])
         if self.interval == "minute10":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/10", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(minute="*/10", second="2")])
         if self.interval == "minute15":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/15", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(minute="*/15", second="2")])
         if self.interval == "minute30":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', minute="*/30", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(minute="*/30", second="2")])
         if self.interval == "minute60":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', hour="*", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(hour="*", second="2")])
         if self.interval == "minute240":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', hour="*/4", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(hour="*/4", second="2")])
         if self.interval == "day":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', day="*", hour="0", minute="0", second="2", id="job")
+            trigger = OrTrigger([CronTrigger(day="*", hour="0", minute="0", second="2")])
 
+        self.scheduler.add_job(self.updatePriceInfo, trigger, id="job")
         self.scheduler.start()
 
+        return True
+
     def updatePriceInfo(self):
+
         data = pyupbit.get_ohlcv(self.ticker, interval=self.interval)
 
         period = 20
@@ -201,7 +244,7 @@ class Bot(QThread):
         나머지: None
         """
 
-        minSellingPrice = self.MA20 + (self.upper - self.MA20) * 2 / 3
+        minSellingPrice = self.MA20 + (self.upper - self.MA20) * self.range
 
         buyingCondition = (self.MA20 <= currentPrice) and (self.previousHighPrice < self.MA20)
         sellingCondition = currentPrice >= minSellingPrice
@@ -210,6 +253,7 @@ class Bot(QThread):
             return "buy"
         if sellingCondition:
             return "sell"
+
         return None
 
     def tradingLogic(self, status):
@@ -218,23 +262,18 @@ class Bot(QThread):
 
         if status == "buy":
             balance = self.upbit.get_balance()
-
             if balance < 5000:
                 return
 
-            buyResult = self.upbit.buy_market_order(self.ticker, balance)
-
+            buyResult = self.upbit.buy_market_order(self.ticker, balance * 0.99)
 
         if status == "sell":
             volume = self.upbit.get_balance(self.ticker)
-
             balance = volume * self.currentPrice
-
             if balance < 5000:
                 return
 
             sellReult = self.upbit.sell_market_order(self.ticker, volume)
-
 
     def stopBot(self):
         """

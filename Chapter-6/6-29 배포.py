@@ -11,11 +11,13 @@ from time import sleep
 from apscheduler.triggers.combining import OrTrigger
 from apscheduler.triggers.cron import CronTrigger
 
+
 def resourcePath(relativePath):
     basePath = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(basePath, relativePath)
 
-uiPath = resourcePath('5-25.ui')
+
+uiPath = resourcePath('ui.ui')
 ui = uic.loadUiType(uiPath)[0]
 
 
@@ -132,10 +134,10 @@ class Bot(QThread):
         """
         private API 객체
         """
-        # access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
-        access = "gXP6ewHuDQQbGp925ieK83APklqExT6BUx4oHXYa"
-        # secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
-        secret = "oCqRyS1tTexJZTxRSDywYndGkxQEmr78pXV2k11l"
+        access = "8eIUpONfW2eGzRFrcmcSWVU4CBLzvJ9f8rfiPCh8"
+        # access = "gXP6ewHuDQQbGp925ieK83APklqExT6BUx4oHXYa"
+        secret = "FZatuQ65in9k1rmd8DOIxmzAiLGAvxR6E1dwL3p5"
+        # secret = "oCqRyS1tTexJZTxRSDywYndGkxQEmr78pXV2k11l"
         self.upbit = pyupbit.Upbit(access, secret)
 
         """
@@ -160,7 +162,6 @@ class Bot(QThread):
         """
         self.scheduler = BackgroundScheduler()
 
-
         if self.interval == "minute1":
             trigger = OrTrigger([CronTrigger(minute="*", second="2")])
         if self.interval == "minute3":
@@ -184,7 +185,6 @@ class Bot(QThread):
         self.scheduler.start()
 
         return True
-
 
     def updatePriceInfo(self):
 
@@ -228,15 +228,20 @@ class Bot(QThread):
         나머지: None
         """
 
-        minSellingPrice = self.MA20 + (self.upper - self.MA20) * 2 / 3
+        minSellingPrice = self.MA20 + (self.upper - self.MA20)
 
         buyingCondition = (self.MA20 <= currentPrice) and (self.previousHighPrice < self.MA20)
         sellingCondition = currentPrice >= minSellingPrice
 
+        print(f"MA20:{self.MA20}, upper:{self.upper}, prevHigh: {self.previousHighPrice}")
+
         if buyingCondition:
+            print("buy")
             return "buy"
         if sellingCondition:
+            print("sell")
             return "sell"
+        print("none")
         return None
 
     def tradingLogic(self, status):
@@ -245,17 +250,15 @@ class Bot(QThread):
 
         if status == "buy":
             balance = self.upbit.get_balance()
-
             if balance < 5000:
                 return
 
-            buyResult = self.upbit.buy_market_order(self.ticker, balance)
+            # 수수료를 감안하여 balance에 0.99를 곱함
+            buyResult = self.upbit.buy_market_order(self.ticker, balance * 0.99)
 
         if status == "sell":
             volume = self.upbit.get_balance(self.ticker)
-
             balance = volume * self.currentPrice
-
             if balance < 5000:
                 return
 
@@ -267,11 +270,8 @@ class Bot(QThread):
         - 스케줄러 중지
         """
         if self.isRunning:
-            print(1)
             self.isRunning = False
-            print(2)
             self.scheduler.remove_job("job")
-            print(3)
 
 
 app = QApplication(sys.argv)
