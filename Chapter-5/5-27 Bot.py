@@ -222,7 +222,7 @@ class Bot(QThread):
             if balance < 5000:
                 return
 
-            buyResult = self.upbit.buy_market_order(self.ticker, balance)
+            buyResult = self.upbit.buy_market_order(self.ticker, balance * 0.99)
 
 
         if status == "sell":
