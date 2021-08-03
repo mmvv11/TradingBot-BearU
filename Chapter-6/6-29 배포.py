@@ -129,7 +129,7 @@ class Bot(QThread):
 
     def __init__(self):
         super(Bot, self).__init__()
-        self.isRunning = False
+        self.isRunning = True
 
         """
         private API 객체
