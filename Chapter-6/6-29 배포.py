@@ -129,7 +129,7 @@ class Bot(QThread):
 
     def __init__(self):
         super(Bot, self).__init__()
-        self.isRunning = True
+        self.isRunning = False
 
         """
         private API 객체
@@ -177,7 +177,7 @@ class Bot(QThread):
         if self.interval == "minute60":
             trigger = OrTrigger([CronTrigger(hour="*", second="2")])
         if self.interval == "minute240":
-            trigger = OrTrigger([CronTrigger(hour="*/4", second="2")])
+            trigger = OrTrigger([CronTrigger(hour="1-23/4", second="2")])
         if self.interval == "day":
             trigger = OrTrigger([CronTrigger(day="*", hour="0", minute="0", second="2")])
 
@@ -199,6 +199,8 @@ class Bot(QThread):
         self.MA20 = data.iloc[-1]['middle']
         self.upper = data.iloc[-1]['upper']
         self.previousHighPrice = data.iloc[-1]['high']
+
+        print("스케줄러")
 
     def startBot(self):
         """
@@ -236,12 +238,9 @@ class Bot(QThread):
         print(f"MA20:{self.MA20}, upper:{self.upper}, prevHigh: {self.previousHighPrice}")
 
         if buyingCondition:
-            print("buy")
             return "buy"
         if sellingCondition:
-            print("sell")
             return "sell"
-        print("none")
         return None
 
     def tradingLogic(self, status):

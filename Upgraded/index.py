@@ -156,7 +156,6 @@ class Bot(QThread):
 
     def firstSetting(self, interval, ticker, range, access, secret):
 
-
         # 코인명
         self.ticker = ticker
         # 매도범위
@@ -193,7 +192,7 @@ class Bot(QThread):
         if self.interval == "minute60":
             trigger = OrTrigger([CronTrigger(hour="*", second="2")])
         if self.interval == "minute240":
-            trigger = OrTrigger([CronTrigger(hour="*/4", second="2")])
+            trigger = OrTrigger([CronTrigger(hour="1-23/4", second="2")])
         if self.interval == "day":
             trigger = OrTrigger([CronTrigger(day="*", hour="0", minute="0", second="2")])
 
