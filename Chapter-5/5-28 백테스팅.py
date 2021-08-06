@@ -8,7 +8,9 @@ upbit = pyupbit.Upbit(access, secret)
 
 period = 20
 multiplier = 2
-ratio = 1
+ratio = 0.8
+interval = "minute15"
+ticker = "KRW-BORA"
 
 isValidBuy = True
 isValidSell = False
@@ -16,7 +18,7 @@ isValidSell = False
 """
 백테스트에 필요한 데이터 가져오기. 4시간봉
 """
-df = pyupbit.get_ohlcv("KRW-BTC", interval="minute60")
+df = pyupbit.get_ohlcv(ticker=ticker, interval=interval)
 df['middleBand'] = df['close'].rolling(period).mean()  # 중간 밴드
 df['upperBand'] = df['close'].rolling(period).mean() + df['close'].rolling(period).std() * multiplier  # 상단 밴드
 df['sellingPrice'] = df['middleBand'] + (df['upperBand'] - df['middleBand']) * ratio  # 목표가 밴드
