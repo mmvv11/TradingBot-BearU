@@ -9,8 +9,8 @@ upbit = pyupbit.Upbit(access, secret)
 period = 20
 multiplier = 2
 ratio = 0.8
-interval = "minute15"
-ticker = "KRW-BORA"
+interval = "minute1"
+ticker = "KRW-AXS"
 
 isValidBuy = True
 isValidSell = False
@@ -68,4 +68,4 @@ df['ror'] = df.apply(getROR, axis=1)
 ror = df['ror'].cumprod()[-1]
 
 # 백테스팅 수익률 계산 결과
-print(ror)
+print(df)

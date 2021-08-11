@@ -211,9 +211,9 @@ class Bot(QThread):
         data['middle'] = data['close'].rolling(period).mean()
         data['upper'] = data['close'].rolling(period).mean() + data['close'].rolling(period).std() * multiplier
 
-        self.MA20 = data.iloc[-1]['middle']
-        self.upper = data.iloc[-1]['upper']
-        self.previousHighPrice = data.iloc[-1]['high']
+        self.MA20 = data.iloc[-2]['middle']
+        self.upper = data.iloc[-2]['upper']
+        self.previousHighPrice = data.iloc[-2]['high']
 
     def startBot(self):
         """

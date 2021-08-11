@@ -1,13 +1,13 @@
 import sys
-
+from apscheduler.schedulers.background import BackgroundScheduler
 from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import *
 from PyQt5 import uic
 import pyupbit
-from apscheduler.schedulers.background import BackgroundScheduler
+
 from time import sleep
 
-ui = uic.loadUiType("ui.ui")[0]
+ui = uic.loadUiType("5-25.ui")[0]
 
 
 class Main(QMainWindow, ui):
@@ -50,7 +50,11 @@ class Main(QMainWindow, ui):
         if not interval:
             return self.popup("기준봉을 설정해주세요.")
 
-        self.bot.firstSetting(interval)
+        isValidStart = self.bot.firstSetting(interval)
+
+        if not isValidStart:
+            return self.popup("유효한 API키가 아닙니다.")
+
         self.bot.start()
 
     def stopBot(self):
@@ -103,7 +107,7 @@ class Bot(QThread):
     1. Main 클래스로부터 interval 값 가져오기 (기준봉)
     2. 필요한 데이터 요청하고 계산하기 (상단 밴드, 중간 밴드, 매도 가격) -> 스케줄러 사용
     3. 봇 실행
-        - 현재 가격 조회
+        - 현재 가격을 조회
         - 가격 상태 판단
         - 매매 수행
     4. 봇 중지
@@ -112,7 +116,7 @@ class Bot(QThread):
     """
 
     def __init__(self):
-        super(Bot, self).__init__()
+        super().__init__()
         self.isRunning = False
 
         """
@@ -123,7 +127,7 @@ class Bot(QThread):
         self.upbit = pyupbit.Upbit(access, secret)
 
         """
-        대상 코인
+        기준 코인
         """
         self.ticker = "KRW-BTC"
 
@@ -131,11 +135,17 @@ class Bot(QThread):
         self.startBot()
 
     def firstSetting(self, interval):
+        isValidAPI = self.upbit.get_balance()
+
+        if not isValidAPI:
+            return False
+
+        # 1. Main 클래스로부터 interval 값 가져오기 (기준봉)
         self.interval = interval
         self.updatePriceInfo()
 
         """
-        기준봉에 따라 데이터를 주기적으로 갱신하는 스케줄러
+        updatePriceInfo 메서드를 호출하는 스케줄러
         """
         self.scheduler = BackgroundScheduler()
 
@@ -154,30 +164,34 @@ class Bot(QThread):
         if self.interval == "minute60":
             self.scheduler.add_job(self.updatePriceInfo, 'cron', hour="*", second="2", id="job")
         if self.interval == "minute240":
-            self.scheduler.add_job(self.updatePriceInfo, 'cron', hour="*/4", second="2", id="job")
+            self.scheduler.add_job(self.updatePriceInfo, 'cron', hour="1-23/4", second="2", id="job")
         if self.interval == "day":
             self.scheduler.add_job(self.updatePriceInfo, 'cron', day="*", hour="0", minute="0", second="2", id="job")
 
         self.scheduler.start()
 
+        return True
+
     def updatePriceInfo(self):
+        # 2. 필요한 데이터 요청하고 계산하기 (상단 밴드, 중간 밴드, 매도 가격) -> 스케줄러 사용
         data = pyupbit.get_ohlcv(self.ticker, interval=self.interval)
 
         period = 20
         multiplier = 2
 
-        data['middle'] = data['close'].rolling(period).mean()
-        data['upper'] = data['close'].rolling(period).mean() + data['close'].rolling(period).std() * multiplier
+        data['middle'] = data['close'].rolling(period).mean()  # 중간밴드
+        data['upper'] = data['close'].rolling(period).mean() + data['close'].rolling(20).std() * multiplier  # 상단밴드
 
-        self.MA20 = data.iloc[-1]['middle']
-        self.upper = data.iloc[-1]['upper']
-        self.previousHighPrice = data.iloc[-1]['high']
+        self.middle = data.iloc[-2]['middle']  # 이전봉 중간밴드 값
+        self.upper = data.iloc[-2]['upper']  # 이전봉 상단밴드 값
+        self.prevHighPrice = data.iloc[-2]['high']  # 이전봉 종가
 
     def startBot(self):
         """
-        봇 실행
-
-        1초 단위로 가격을 감시하고 매매타이밍 포착
+        3. 봇 실행
+        - 현재 가격을 조회
+        - 가격 상태 판단
+        - 매매 수행
         """
 
         if not self.isRunning:
@@ -191,25 +205,26 @@ class Bot(QThread):
 
     def getStatus(self, currentPrice):
         """
-        현재 가격 상태 반환 메서드
+        현재 가격 상태 반환
 
-        매수: 이전봉 고가는 20선 아래에 있고, 현재 가격이 20선을 돌파한 경우
-        매도: 상단밴드와 중간밴드의 2/3지점을 돌파
+        매수: 이전봉 고가는 중간밴드 아래, 현재가격이 중간밴드를 돌파
+        매도: 상단밴드와 중간밴드의 2/3 돌파
 
-        매수 타이밍 : buy
+        매수 타이밍: buy
         매도 타이밍: sell
         나머지: None
         """
 
-        minSellingPrice = self.MA20 + (self.upper - self.MA20) * 2 / 3
+        targetPrice = self.middle + (self.upper - self.middle) * 2 / 3
 
-        buyingCondition = (self.MA20 <= currentPrice) and (self.previousHighPrice < self.MA20)
-        sellingCondition = currentPrice >= minSellingPrice
+        buyingCondition = (currentPrice > self.middle) and (self.prevHighPrice < self.middle)
+        sellingCondition = currentPrice >= targetPrice
 
         if buyingCondition:
             return "buy"
         if sellingCondition:
             return "sell"
+
         return None
 
     def tradingLogic(self, status):
@@ -217,27 +232,28 @@ class Bot(QThread):
             return
 
         if status == "buy":
+            # 매수
             balance = self.upbit.get_balance()
 
             if balance < 5000:
                 return
 
-            buyResult = self.upbit.buy_market_order(self.ticker, balance * 0.99)
-
+            self.upbit.buy_market_order(self.ticker, balance * 0.99)
 
         if status == "sell":
+            # 매도
             volume = self.upbit.get_balance(self.ticker)
-
             balance = volume * self.currentPrice
 
             if balance < 5000:
                 return
 
-            sellReult = self.upbit.sell_market_order(self.ticker, volume)
-
+            self.upbit.sell_market_order(self.ticker, volume)
 
     def stopBot(self):
         """
+        봇 중지
+
         - 봇 중지
         - 스케줄러 중지
         """
